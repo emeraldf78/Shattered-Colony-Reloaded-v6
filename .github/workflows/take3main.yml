@@ -1,0 +1,47 @@
+name: Build Shattered Colony v6
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build Archive
+        run: |
+          # 1. The exact path based on your folder structure
+          # Path: ShatteredColony_v6 -> ShatteredColony -> ShatteredColony_v6.xcodeproj
+          PROJ_PATH="ShatteredColony_v6/ShatteredColony/ShatteredColony_v6.xcodeproj"
+          
+          # 2. Automatically find the Scheme (the build 'recipe')
+          SCHEME_NAME=$(xcodebuild -list -project "$PROJ_PATH" | awk '/Schemes:/{flag=1;next} flag{print;exit}' | xargs)
+          echo "Detected Scheme: $SCHEME_NAME"
+          
+          # 3. Build the Archive
+          xcodebuild clean archive \
+            -project "$PROJ_PATH" \
+            -scheme "$SCHEME_NAME" \
+            -archivePath "./build/ShatteredColony.xcarchive" \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Create IPA Payload
+        run: |
+          APP_PATH=$(find ./build/ShatteredColony.xcarchive -name "*.app" -type d -print -quit)
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          zip -r ShatteredColony_v6.ipa Payload
+
+      - name: Upload Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShatteredColony-v6-IPA
+          path: ShatteredColony_v6.ipa
